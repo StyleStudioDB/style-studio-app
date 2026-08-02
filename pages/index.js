@@ -1,280 +1,230 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import Head from 'next/head';
 
 export default function Home() {
-  const [modelMode, setModelMode] = useState('turban');
-  const [source, setSource] = useState('mixed');
-  const [count, setCount] = useState(5);
-  const [aiDecide, setAiDecide] = useState(true);
+  const [activeTab, setActiveTab] = useState('Home');
+  const [uploading, setUploading] = useState(false);
 
-  // Model Profile & Multi-Angle States
-  const [selectedModel, setSelectedModel] = useState('Model 1');
-  const [modelPhotos, setModelPhotos] = useState({
-    front: '',
-    left: '',
-    right: '',
-    back: ''
-  });
+  // Default state for Models
+  const [models, setModels] = useState([
+    {
+      id: 'turban',
+      name: 'Turban Model',
+      mode: 'Turban mode',
+      active: false,
+      angles: { front: '/placeholder-model.jpg', left: null, right: null, back: null },
+    },
+    {
+      id: 'cap',
+      name: 'Baseball Cap Model',
+      mode: 'Baseball Cap mode',
+      active: true,
+      angles: {
+        front: '/placeholder-cap-front.jpg',
+        left: '/placeholder-cap-left.jpg',
+        right: '/placeholder-cap-right.jpg',
+        back: '/placeholder-cap-back.jpg',
+      },
+    },
+    {
+      id: 'beanie',
+      name: 'Beanie Model',
+      mode: 'Beanie mode',
+      active: false,
+      angles: { front: null, left: null, right: null, back: null },
+    },
+  ]);
 
-  // Dynamic States
-  const [loading, setLoading] = useState(false);
-  const [uploadingAngle, setUploadingAngle] = useState(null);
-  const [outfitResults, setOutfitResults] = useState([]);
-  const [savedOutfits, setSavedOutfits] = useState([]);
-
-  // Client-Side Image Resizer & Multi-Angle Uploader
-  const handleAngleUpload = (e, angle) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setUploadingAngle(angle);
-    const img = new Image();
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      img.src = event.target.result;
-      img.onload = () => {
-        // Auto-resize large camera photos to fit under upload limits
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200;
-        const scaleSize = MAX_WIDTH / img.width;
-
-        if (scaleSize < 1) {
-          canvas.width = MAX_WIDTH;
-          canvas.height = img.height * scaleSize;
-        } else {
-          canvas.width = img.width;
-          canvas.height = img.height;
-        }
-
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const resizedBase64 = canvas.toDataURL('image/jpeg', 0.85);
-
-        // Upload to API
-        fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: resizedBase64,
-            fileName: `${angle}_${file.name}`,
-            modelName: selectedModel,
-            angle: angle,
-          }),
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.url) {
-              setModelPhotos((prev) => ({ ...prev, [angle]: data.url }));
-            } else {
-              alert('Upload failed: ' + (data.error || 'Unknown error'));
-            }
-          })
-          .catch((err) => alert('Upload failed: ' + err.message))
-          .finally(() => setUploadingAngle(null));
-      };
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Generate Outfits with Gemini AI
-  const handleGenerateOutfit = async () => {
-    setLoading(true);
-    setOutfitResults([]);
-
-    try {
-      const res = await fetch('/api/generate-outfit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          modelMode,
-          source,
-          count,
-          aiDecide,
-          modelName: selectedModel,
-          modelPhotos: modelPhotos,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.result) {
-        try {
-          const cleanText = data.result.replace(/```json|```/g, '').trim();
-          const parsed = JSON.parse(cleanText);
-          setOutfitResults(Array.isArray(parsed) ? parsed : [parsed]);
-        } catch {
-          setOutfitResults([{ title: 'AI Recommendation', details: data.result }]);
-        }
-      } else {
-        alert('Generation failed: ' + (data.error || 'Unknown error'));
-      }
-    } catch (err) {
-      alert('Generation failed: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Save Outfit & Model Photos
-  const handleSaveOutfit = (outfit) => {
-    const newSave = {
-      ...outfit,
-      savedAt: new Date().toLocaleDateString(),
-      modelName: selectedModel,
-      photos: { ...modelPhotos },
-      modelMode,
-    };
-    setSavedOutfits([newSave, ...savedOutfits]);
-    alert(`Outfit saved for ${selectedModel}!`);
-  };
+  // Default state for Outfits
+  const [outfits] = useState([
+    {
+      id: '1',
+      title: '3. Linen Shirt + Olive Chino',
+      style: 'Everyday · relaxed refined · Baseball Cap',
+      weather: 'Current weather',
+      inStock: true,
+      previewUrl: '/placeholder-cap-front.jpg',
+      items: [{ name: 'Principle Dress Leather Strap Watch', category: 'Accessories' }],
+    },
+    {
+      id: '2',
+      title: '2. White Oxford + Navy Chino',
+      style: 'Everyday · crisp smart casual · Baseball Cap',
+      weather: 'Current weather',
+      inStock: true,
+      previewUrl: '/placeholder-cap-front.jpg',
+      items: [
+        { name: 'Principle Dress Leather Strap Watch', category: 'Accessories' },
+        { name: 'Oxford Slim Shirt', category: 'Top' },
+      ],
+    },
+  ]);
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#0f172a', color: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
-      <header style={{ borderBottom: '1px solid #334155', paddingBottom: '15px', marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ color: '#34d399', margin: 0, fontSize: '22px' }}>STYLE STUDIO AI</h1>
-          <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>Multi-Angle Model Styling Engine</p>
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased">
+      <Head>
+        <title>Style Studio AI</title>
+      </Head>
+
+      {/* Top Navigation */}
+      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-xl font-black tracking-tight text-white">Style Studio</span>
+            <span className="text-[10px] bg-slate-800 text-emerald-400 border border-slate-700 px-2 py-0.5 rounded-full font-mono">v7 manual-first</span>
+          </div>
+          <nav className="hidden md:flex items-center gap-1">
+            {['Home', 'My Models', 'Scan Wardrobe', 'Wardrobe', 'Headwear Studio', 'Generate', 'My Outfits', 'Shopping', 'Preview Studio', 'Style DNAs', 'History', 'Settings'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  activeTab === tab ? 'bg-slate-800 text-white font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </nav>
+          <div className="text-xs text-slate-400 font-mono">Ready</div>
         </div>
-        <span style={{ fontSize: '12px', background: '#1e293b', border: '1px solid #34d399', color: '#34d399', padding: '4px 10px', borderRadius: '12px' }}>PWA Ready</span>
       </header>
 
-      <main style={{ maxWidth: '850px', margin: '0 auto' }}>
-        <div style={{ background: '#1e293b', padding: '20px', borderRadius: '12px', border: '1px solid #334155' }}>
-          
-          {/* Section 1: Model Selection */}
-          <div style={{ marginBottom: '25px', borderBottom: '1px solid #334155', paddingBottom: '15px' }}>
-            <h3 style={{ marginTop: 0, fontSize: '16px', color: '#38bdf8' }}>1. Select or Name Model Profile</h3>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <input 
-                type="text" 
-                value={selectedModel} 
-                onChange={(e) => setSelectedModel(e.target.value)}
-                placeholder="Model Name (e.g. Self, Alex)"
-                style={{ background: '#0f172a', border: '1px solid #475569', color: '#fff', padding: '10px', borderRadius: '8px', flex: 1 }}
-              />
-              <span style={{ fontSize: '12px', color: '#94a3b8' }}>Photos assign directly to this model</span>
-            </div>
-          </div>
-
-          {/* Section 2: Multi-Angle Photo Uploads */}
-          <div style={{ marginBottom: '25px' }}>
-            <h3 style={{ marginTop: 0, fontSize: '16px', color: '#38bdf8' }}>2. Upload Model Angles for [{selectedModel}]</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '15px' }}>
-              {['front', 'left', 'right', 'back'].map((angle) => (
-                <div key={angle} style={{ background: '#0f172a', border: '1px dashed #475569', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
-                  <h4 style={{ margin: '0 0 8px', textTransform: 'uppercase', fontSize: '12px', color: '#34d399' }}>{angle} View</h4>
-                  
-                  {modelPhotos[angle] ? (
-                    <div>
-                      <img src={modelPhotos[angle]} alt={angle} style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '6px', marginBottom: '8px', border: '1px solid #34d399' }} />
-                      <label style={{ fontSize: '11px', color: '#38bdf8', cursor: 'pointer', textDecoration: 'underline' }}>
-                        Change
-                        <input type="file" accept="image/*" onChange={(e) => handleAngleUpload(e, angle)} style={{ display: 'none' }} />
-                      </label>
-                    </div>
-                  ) : (
-                    <div>
-                      <div style={{ height: '90px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '24px' }}>📷</div>
-                      <label style={{ background: '#334155', color: '#fff', fontSize: '12px', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', display: 'inline-block', width: '80%' }}>
-                        {uploadingAngle === angle ? 'Uploading...' : `Add ${angle}`}
-                        <input type="file" accept="image/*" onChange={(e) => handleAngleUpload(e, angle)} disabled={uploadingAngle === angle} style={{ display: 'none' }} />
-                      </label>
-                    </div>
-                  )}
+      {/* Main Container */}
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        
+        {/* TAB 1: HOME */}
+        {activeTab === 'Home' && (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-2 bg-slate-900/80 border border-slate-800 rounded-2xl p-8 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Zero Typing Wardrobe</span>
+                  <h1 className="text-4xl font-extrabold text-white mt-2 leading-tight">Upload photos.<br />Tap a look.<br />See it on you.</h1>
+                  <p className="text-sm text-slate-400 mt-4 max-w-lg leading-relaxed">
+                    Style Studio stores your model modes and wardrobe, then hands outfit requests to your Custom GPT for search and previewing without extra API fees.
+                  </p>
                 </div>
-              ))}
+                <div className="flex flex-wrap gap-3 mt-8">
+                  <button onClick={() => setActiveTab('Scan Wardrobe')} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition-all">Scan clothing</button>
+                  <button onClick={() => setActiveTab('Generate')} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition-all">Generate outfits</button>
+                  <button onClick={() => setActiveTab('My Models')} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition-all">Set up models</button>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Active Setup</span>
+                <h2 className="text-base font-bold text-white mt-1">Baseball Cap Model · Everyday Smart Casual</h2>
+                <div className="mt-4 space-y-3">
+                  {['Front model photo', 'Wardrobe', 'Style DNA'].map((step) => (
+                    <div key={step} className="p-3 bg-emerald-950/30 border border-emerald-800/40 rounded-xl flex items-center justify-between">
+                      <span className="text-xs font-semibold text-emerald-300">✓ {step}</span>
+                      <span className="text-[10px] text-emerald-500 font-mono uppercase">Ready</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Section 3: Model Headwear Mode */}
-          <h3>3. Selected Model Headwear / Style</h3>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            {['turban', 'cap', 'beanie'].map((m) => (
-              <button key={m} onClick={() => setModelMode(m)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: modelMode === m ? '#34d399' : '#334155', color: modelMode === m ? '#0f172a' : '#fff', fontWeight: 'bold', cursor: 'pointer' }}>
-                {m.toUpperCase()}
-              </button>
-            ))}
-          </div>
+        {/* TAB 2: MY MODELS */}
+        {activeTab === 'My Models' && (
+          <div className="space-y-6">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Your Visual Identity</span>
+              <h2 className="text-2xl font-extrabold text-white">My Models</h2>
+            </div>
 
-          {/* Section 4: Outfit Strategy */}
-          <h3>4. Outfit Source</h3>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            {['wardrobe', 'shopping', 'mixed'].map((s) => (
-              <button key={s} onClick={() => setSource(s)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: source === s ? '#34d399' : '#334155', color: source === s ? '#0f172a' : '#fff', fontWeight: 'bold', cursor: 'pointer' }}>
-                {s.toUpperCase()}
-              </button>
-            ))}
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+              {models.map((model) => (
+                <div
+                  key={model.id}
+                  className={`bg-slate-900 border rounded-2xl p-5 flex flex-col justify-between w-full overflow-hidden ${
+                    model.active ? 'border-emerald-500/60 ring-1 ring-emerald-500/30' : 'border-slate-800'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-base font-bold text-white">{model.name}</h3>
+                      {model.active && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">Active</span>}
+                    </div>
+                    <p className="text-xs text-slate-400 mb-4">{model.mode}</p>
 
-          <h3>5. Outfit Count</h3>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            {[2, 5, 10].map((num) => (
-              <button key={num} onClick={() => setCount(num)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: count === num ? '#34d399' : '#334155', color: count === num ? '#0f172a' : '#fff', fontWeight: 'bold', cursor: 'pointer' }}>
-                {num} OUTFITS
-              </button>
-            ))}
-          </div>
+                    {/* Fixed Angle Grid Container - prevents spillover */}
+                    <div className="grid grid-cols-4 gap-2 w-full min-w-0">
+                      {['front', 'left', 'right', 'back'].map((angle) => (
+                        <div key={angle} className="relative aspect-[3/4] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col items-center justify-center min-w-0 w-full">
+                          {model.angles[angle] ? (
+                            <img src={model.angles[angle]} alt={angle} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">{angle}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-          <div style={{ borderTop: '1px solid #334155', paddingTop: '15px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Brand Engine</span>
-            <button onClick={() => setAiDecide(!aiDecide)} style={{ padding: '8px 12px', borderRadius: '6px', border: 'none', background: aiDecide ? '#4f46e5' : '#334155', color: '#fff', cursor: 'pointer', fontWeight: 'bold' }}>
-              {aiDecide ? '✓ AI DECIDE ACTIVE' : 'MANUAL BRANDS'}
-            </button>
-          </div>
-
-          <button onClick={handleGenerateOutfit} disabled={loading} style={{ width: '100%', padding: '14px', borderRadius: '8px', border: 'none', background: loading ? '#64748b' : '#34d399', color: '#0f172a', fontSize: '16px', fontWeight: 'bold', cursor: loading ? 'not-allowed' : 'pointer' }}>
-            {loading ? `ANALYZING 360° ANGLES FOR ${selectedModel.toUpperCase()}...` : 'CREATE OUTFIT REQUEST'}
-          </button>
-        </div>
-
-        {/* Outfit Recommendations Display */}
-        {outfitResults.length > 0 && (
-          <div style={{ marginTop: '30px' }}>
-            <h2 style={{ color: '#34d399', marginBottom: '15px' }}>Generated Outfit Recommendations for {selectedModel}</h2>
-            <div style={{ display: 'grid', gap: '15px' }}>
-              {outfitResults.map((outfit, index) => (
-                <div key={index} style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '15px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                    <h3 style={{ margin: 0, color: '#38bdf8' }}>{outfit.title || `Outfit #${index + 1}`}</h3>
-                    <button onClick={() => handleSaveOutfit(outfit)} style={{ background: '#34d399', color: '#0f172a', border: 'none', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
-                      💾 Save Outfit
+                  <div className="mt-6 space-y-2">
+                    <button className="w-full py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold hover:bg-emerald-500/20 transition-all">
+                      Add photos / video
+                    </button>
+                    <button className="w-full py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-medium hover:bg-slate-700 transition-all">
+                      Allow another headwear item
                     </button>
                   </div>
-
-                  {outfit.items && Array.isArray(outfit.items) ? (
-                    <ul style={{ paddingLeft: '20px', color: '#e2e8f0', margin: '10px 0' }}>
-                      {outfit.items.map((item, i) => (
-                        <li key={i} style={{ marginBottom: '4px' }}>{item}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p style={{ color: '#e2e8f0', fontSize: '14px' }}>{outfit.details || JSON.stringify(outfit)}</p>
-                  )}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Saved Outfits Gallery */}
-        {savedOutfits.length > 0 && (
-          <div style={{ marginTop: '40px', borderTop: '2px solid #334155', paddingTop: '20px' }}>
-            <h2 style={{ color: '#38bdf8' }}>⭐ Saved Outfits Gallery ({savedOutfits.length})</h2>
-            <div style={{ display: 'grid', gap: '15px' }}>
-              {savedOutfits.map((saved, idx) => (
-                <div key={idx} style={{ background: '#0f172a', border: '1px solid #475569', borderRadius: '10px', padding: '15px', display: 'flex', gap: '15px', alignItems: 'center' }}>
-                  {saved.photos?.front && (
-                    <img src={saved.photos.front} alt="Front Ref" style={{ width: '70px', height: '70px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #34d399' }} />
-                  )}
-                  <div style={{ flex: 1 }}>
-                    <h4 style={{ margin: '0 0 5px', color: '#34d399' }}>{saved.title || `Outfit #${idx + 1}`} ({saved.modelName})</h4>
-                    <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>Saved on {saved.savedAt} • Headwear: {saved.modelMode}</p>
-                    {saved.items && <p style={{ margin: '5px 0 0', fontSize: '12px', color: '#cbd5e1' }}>{saved.items.join(' • ')}</p>}
+        {/* TAB 3: MY OUTFITS */}
+        {activeTab === 'My Outfits' && (
+          <div className="space-y-6">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Your Saved Looks</span>
+              <h2 className="text-2xl font-extrabold text-white">My Outfits</h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {outfits.map((outfit) => (
+                <div key={outfit.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col h-auto w-full">
+                  <div className="relative aspect-[3/4] w-full bg-slate-950 overflow-hidden">
+                    <img src={outfit.previewUrl} alt={outfit.title} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="p-5 flex flex-col gap-3 flex-grow">
+                    <h3 className="text-sm font-bold text-white leading-snug">{outfit.title}</h3>
+                    <p className="text-xs text-slate-400">{outfit.style}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="px-2 py-0.5 text-[10px] bg-slate-800 text-slate-300 rounded-full">{outfit.weather}</span>
+                      <span className="px-2 py-0.5 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800/40 rounded-full">In stock</span>
+                    </div>
+
+                    {/* Accessories / Items Container - Non-truncated */}
+                    <div className="mt-auto pt-3 border-t border-slate-800/80 flex flex-col gap-2">
+                      {outfit.items.map((item, idx) => (
+                        <div key={idx} className="bg-slate-950 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between">
+                          <span className="text-xs text-slate-200 font-medium">{item.name}</span>
+                          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">{item.category}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
+
+        {/* Other Tabs Fallback */}
+        {!['Home', 'My Models', 'My Outfits'].includes(activeTab) && (
+          <div className="p-12 text-center bg-slate-900/50 border border-slate-800 rounded-2xl">
+            <h3 className="text-lg font-bold text-white">{activeTab} Module Active</h3>
+            <p className="text-xs text-slate-400 mt-2">Ready to process requests for {activeTab.toLowerCase()}.</p>
+          </div>
+        )}
+
       </main>
     </div>
   );
