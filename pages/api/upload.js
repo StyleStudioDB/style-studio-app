@@ -5,7 +5,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// Increase Next.js API payload size limit to 10MB
 export const config = {
   api: {
     bodyParser: {
@@ -35,7 +34,7 @@ export default async function handler(req, res) {
     const safeAngle = String(angle).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') || 'front';
     const fileName = `${safeModel}_${safeAngle}_${Date.now()}.jpg`;
 
-    // Upload directly to public bucket 'outfit-images'
+    // Upload to 'outfit-images' public bucket
     const { data, error } = await supabase.storage
       .from('outfit-images')
       .upload(fileName, buffer, {
