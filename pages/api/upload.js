@@ -20,17 +20,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { imageBase64, fileName, modelName = 'default', angle = 'front' } = req.body;
-    const buffer = Buffer.from(imageBase64.split(',')[1], 'base64');
+    const { imageBase64, modelName = 'default', angle = 'front' } = req.body;
     
-    // Path format in Supabase bucket: models/{modelName}/{angle}_{timestamp}.png
-    const filePath = `models/${modelName.toLowerCase().replace(/\s+/g, '_')}/${angle}_${Date.now()}.png`;
+    // Clean base64 string and extract buffer
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Sanitize model name (remove special characters/spaces)
+    const safeModelName = modelName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') || 'model';
+    const safeAngle = angle.trim().toLowerCase();
+    
+    // Create a flat filename that Supabase Storage accepts without folder path errors
+    const filePath = `${safeModelName}_${safeAngle}_${Date.now()}.jpg`;
 
     const { data, error } = await supabase.storage
       .from('outfit-images')
       .upload(filePath, buffer, {
-        contentType: 'image/png',
-        upsert: true
+        contentType: 'image/jpeg',
+        upsert: true,
       });
 
     if (error) throw error;
