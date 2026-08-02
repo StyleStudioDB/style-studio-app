@@ -1,215 +1,193 @@
-import React, { useState } from 'react';
-import Head from 'next/head';
+import { useState } from 'react';
 
-export default function Home() {
+export default function StyleStudioDashboard() {
   const [activeTab, setActiveTab] = useState('Home');
-  const [uploading, setUploading] = useState(false);
+  const [activeModel, setActiveModel] = useState({
+    id: 'm1',
+    name: 'Baseball Cap Model',
+    mode: 'Everyday Smart Casual',
+    headwear: 'Baseball Cap',
+    photoUrl: 'https://via.placeholder.com/150',
+    angles: { front: true, left: true, right: true, back: false }
+  });
 
-  // Default state for Models
-  const [models, setModels] = useState([
+  const [activeDna, setActiveDna] = useState({
+    id: 'dna1',
+    name: 'Smart Casual Summer',
+    preferredStyles: ['Minimal', 'Smart Casual'],
+    favoriteColors: ['Navy', 'White', 'Olive'],
+    colorsToAvoid: ['Bright Yellow']
+  });
+
+  // Example state for outfits being processed or generated
+  const [outfits, setOutfits] = useState([
     {
-      id: 'turban',
-      name: 'Turban Model',
-      mode: 'Turban mode',
-      active: false,
-      angles: { front: '/placeholder-model.jpg', left: null, right: null, back: null },
-    },
-    {
-      id: 'cap',
-      name: 'Baseball Cap Model',
-      mode: 'Baseball Cap mode',
-      active: true,
-      angles: {
-        front: '/placeholder-cap-front.jpg',
-        left: '/placeholder-cap-left.jpg',
-        right: '/placeholder-cap-right.jpg',
-        back: '/placeholder-cap-back.jpg',
-      },
-    },
-    {
-      id: 'beanie',
-      name: 'Beanie Model',
-      mode: 'Beanie mode',
-      active: false,
-      angles: { front: null, left: null, right: null, back: null },
-    },
+      id: 'outfit-101',
+      title: 'Monochrome Summer Linen',
+      occasion: 'Casual Weekend',
+      weather: 'Warm (78°F)',
+      vibe: 'Relaxed Minimal',
+      totalPrice: 145.00,
+      saveStatus: 'unreviewed',
+      products: [
+        { id: 'p1', role: 'top', product_name: 'Linen Shirt', brand: 'Uniqlo', price: 39.90, is_locked: true, validation_status: 'valid', image_url: 'https://via.placeholder.com/100' },
+        { id: 'p2', role: 'bottom', product_name: 'Chino Shorts', brand: 'J.Crew', price: 59.50, is_locked: true, validation_status: 'valid', image_url: 'https://via.placeholder.com/100' },
+        { id: 'p3', role: 'shoes', product_name: 'White Canvas Sneakers', brand: 'Vans', price: 45.60, is_locked: false, validation_status: 'invalid', image_url: '' }
+      ]
+    }
   ]);
 
-  // Default state for Outfits
-  const [outfits] = useState([
-    {
-      id: '1',
-      title: '3. Linen Shirt + Olive Chino',
-      style: 'Everyday · relaxed refined · Baseball Cap',
-      weather: 'Current weather',
-      inStock: true,
-      previewUrl: '/placeholder-cap-front.jpg',
-      items: [{ name: 'Principle Dress Leather Strap Watch', category: 'Accessories' }],
-    },
-    {
-      id: '2',
-      title: '2. White Oxford + Navy Chino',
-      style: 'Everyday · crisp smart casual · Baseball Cap',
-      weather: 'Current weather',
-      inStock: true,
-      previewUrl: '/placeholder-cap-front.jpg',
-      items: [
-        { name: 'Principle Dress Leather Strap Watch', category: 'Accessories' },
-        { name: 'Oxford Slim Shirt', category: 'Top' },
-      ],
-    },
-  ]);
+  const [activePreview, setActivePreview] = useState(null);
+  const [activeRepair, setActiveRepair] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Trigger Role-Locked Repair via /api/repair
+  const handleRunRepair = async (outfit) => {
+    setIsProcessing(true);
+    try {
+      const res = await fetch('/api/repair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outfitId: outfit.id, products: outfit.products })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActiveRepair(data.repairManifest);
+      }
+    } catch (err) {
+      alert('Failed to initiate repair request');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Trigger Reference Board Generation via /api/generate-board
+  const handleGenerateBoard = async (outfit) => {
+    setIsProcessing(true);
+    try {
+      const res = await fetch('/api/generate-board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          outfitId: outfit.id,
+          outfitTitle: outfit.title,
+          modelProfile: activeModel,
+          products: outfit.products
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActivePreview(data);
+      }
+    } catch (err) {
+      alert('Failed to generate reference board');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const navTabs = [
+    'Home', 'My Models', 'Scan Wardrobe', 'Wardrobe', 
+    'Style DNAs', 'Generate', 'My Outfits', 'Preview Studio', 'Shopping', 'Settings'
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased">
-      <Head>
-        <title>Style Studio AI</title>
-      </Head>
-
-      {/* Top Navigation */}
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+      {/* Top Header / Navigation Bar */}
+      <header className="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-40 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="text-xl font-black tracking-tight text-white">Style Studio</span>
-            <span className="text-[10px] bg-slate-800 text-emerald-400 border border-slate-700 px-2 py-0.5 rounded-full font-mono">v7 manual-first</span>
+            <h1 className="text-xl font-bold tracking-tight text-white">Style Studio</h1>
+            <span className="text-xs bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/20 font-medium">
+              v7 engine active
+            </span>
           </div>
-          <nav className="hidden md:flex items-center gap-1">
-            {['Home', 'My Models', 'Scan Wardrobe', 'Wardrobe', 'Headwear Studio', 'Generate', 'My Outfits', 'Shopping', 'Preview Studio', 'Style DNAs', 'History', 'Settings'].map((tab) => (
+
+          <nav className="flex flex-wrap items-center gap-1">
+            {navTabs.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activeTab === tab ? 'bg-slate-800 text-white font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === tab
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                 }`}
               >
                 {tab}
               </button>
             ))}
           </nav>
-          <div className="text-xs text-slate-400 font-mono">Ready</div>
         </div>
       </header>
 
-      {/* Main Container */}
+      {/* Main Content View */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        
-        {/* TAB 1: HOME */}
+        {/* TAB: HOME */}
         {activeTab === 'Home' && (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 bg-slate-900/80 border border-slate-800 rounded-2xl p-8 flex flex-col justify-between">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Zero Typing Wardrobe</span>
-                  <h1 className="text-4xl font-extrabold text-white mt-2 leading-tight">Upload photos.<br />Tap a look.<br />See it on you.</h1>
-                  <p className="text-sm text-slate-400 mt-4 max-w-lg leading-relaxed">
-                    Style Studio stores your model modes and wardrobe, then hands outfit requests to your Custom GPT for search and previewing without extra API fees.
-                  </p>
+          <div className="space-y-6">
+            <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+              <h2 className="text-lg font-semibold text-white mb-2">Active Configuration</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-300">
+                <div className="bg-slate-950 p-4 rounded-lg border border-slate-800/80">
+                  <span className="text-xs text-slate-500 uppercase tracking-wider block mb-1">Active Model</span>
+                  <p className="font-medium text-white">{activeModel.name} ({activeModel.headwear})</p>
+                  <p className="text-slate-400 text-xs mt-1">Mode: {activeModel.mode}</p>
                 </div>
-                <div className="flex flex-wrap gap-3 mt-8">
-                  <button onClick={() => setActiveTab('Scan Wardrobe')} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition-all">Scan clothing</button>
-                  <button onClick={() => setActiveTab('Generate')} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition-all">Generate outfits</button>
-                  <button onClick={() => setActiveTab('My Models')} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition-all">Set up models</button>
-                </div>
-              </div>
-
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Active Setup</span>
-                <h2 className="text-base font-bold text-white mt-1">Baseball Cap Model · Everyday Smart Casual</h2>
-                <div className="mt-4 space-y-3">
-                  {['Front model photo', 'Wardrobe', 'Style DNA'].map((step) => (
-                    <div key={step} className="p-3 bg-emerald-950/30 border border-emerald-800/40 rounded-xl flex items-center justify-between">
-                      <span className="text-xs font-semibold text-emerald-300">✓ {step}</span>
-                      <span className="text-[10px] text-emerald-500 font-mono uppercase">Ready</span>
-                    </div>
-                  ))}
+                <div className="bg-slate-950 p-4 rounded-lg border border-slate-800/80">
+                  <span className="text-xs text-slate-500 uppercase tracking-wider block mb-1">Active Style DNA</span>
+                  <p className="font-medium text-white">{activeDna.name}</p>
+                  <p className="text-slate-400 text-xs mt-1">Styles: {activeDna.preferredStyles.join(', ')}</p>
                 </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* TAB 2: MY MODELS */}
-        {activeTab === 'My Models' && (
-          <div className="space-y-6">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Your Visual Identity</span>
-              <h2 className="text-2xl font-extrabold text-white">My Models</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-              {models.map((model) => (
-                <div
-                  key={model.id}
-                  className={`bg-slate-900 border rounded-2xl p-5 flex flex-col justify-between w-full overflow-hidden ${
-                    model.active ? 'border-emerald-500/60 ring-1 ring-emerald-500/30' : 'border-slate-800'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-base font-bold text-white">{model.name}</h3>
-                      {model.active && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">Active</span>}
-                    </div>
-                    <p className="text-xs text-slate-400 mb-4">{model.mode}</p>
-
-                    {/* Fixed Angle Grid Container - prevents spillover */}
-                    <div className="grid grid-cols-4 gap-2 w-full min-w-0">
-                      {['front', 'left', 'right', 'back'].map((angle) => (
-                        <div key={angle} className="relative aspect-[3/4] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col items-center justify-center min-w-0 w-full">
-                          {model.angles[angle] ? (
-                            <img src={model.angles[angle]} alt={angle} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">{angle}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-6 space-y-2">
-                    <button className="w-full py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold hover:bg-emerald-500/20 transition-all">
-                      Add photos / video
-                    </button>
-                    <button className="w-full py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-medium hover:bg-slate-700 transition-all">
-                      Allow another headwear item
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: MY OUTFITS */}
-        {activeTab === 'My Outfits' && (
-          <div className="space-y-6">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Your Saved Looks</span>
-              <h2 className="text-2xl font-extrabold text-white">My Outfits</h2>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {/* Outfits List */}
+            <div className="space-y-4">
+              <h3 className="text-md font-semibold text-slate-200">Pending Outfits ({outfits.length})</h3>
               {outfits.map((outfit) => (
-                <div key={outfit.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col h-auto w-full">
-                  <div className="relative aspect-[3/4] w-full bg-slate-950 overflow-hidden">
-                    <img src={outfit.previewUrl} alt={outfit.title} className="w-full h-full object-cover" />
+                <div key={outfit.id} className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-4">
+                    <div>
+                      <h4 className="text-lg font-bold text-white">{outfit.title}</h4>
+                      <p className="text-xs text-slate-400">{outfit.occasion} • {outfit.vibe} • {outfit.weather}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleRunRepair(outfit)}
+                        disabled={isProcessing}
+                        className="px-3 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 text-xs font-medium rounded-lg hover:bg-amber-600/30 transition"
+                      >
+                        Check & Repair Products
+                      </button>
+                      <button
+                        onClick={() => handleGenerateBoard(outfit)}
+                        disabled={isProcessing}
+                        className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-500 transition shadow"
+                      >
+                        Preview on Me
+                      </button>
+                    </div>
                   </div>
-                  <div className="p-5 flex flex-col gap-3 flex-grow">
-                    <h3 className="text-sm font-bold text-white leading-snug">{outfit.title}</h3>
-                    <p className="text-xs text-slate-400">{outfit.style}</p>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="px-2 py-0.5 text-[10px] bg-slate-800 text-slate-300 rounded-full">{outfit.weather}</span>
-                      <span className="px-2 py-0.5 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800/40 rounded-full">In stock</span>
-                    </div>
 
-                    {/* Accessories / Items Container - Non-truncated */}
-                    <div className="mt-auto pt-3 border-t border-slate-800/80 flex flex-col gap-2">
-                      {outfit.items.map((item, idx) => (
-                        <div key={idx} className="bg-slate-950 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between">
-                          <span className="text-xs text-slate-200 font-medium">{item.name}</span>
-                          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">{item.category}</span>
+                  {/* Garment / Product Roles */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {outfit.products.map((item) => (
+                      <div key={item.id} className="bg-slate-950 border border-slate-800/80 rounded-lg p-3 text-xs flex justify-between items-center">
+                        <div>
+                          <span className="uppercase text-[10px] font-bold text-slate-500 block">{item.role}</span>
+                          <p className="font-medium text-slate-200">{item.product_name || 'Unassigned'}</p>
+                          <p className="text-slate-400">${item.price}</p>
                         </div>
-                      ))}
-                    </div>
+                        <span className={`px-2 py-0.5 text-[10px] rounded border ${
+                          item.validation_status === 'valid'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        }`}>
+                          {item.validation_status}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -217,14 +195,94 @@ export default function Home() {
           </div>
         )}
 
-        {/* Other Tabs Fallback */}
-        {!['Home', 'My Models', 'My Outfits'].includes(activeTab) && (
-          <div className="p-12 text-center bg-slate-900/50 border border-slate-800 rounded-2xl">
-            <h3 className="text-lg font-bold text-white">{activeTab} Module Active</h3>
-            <p className="text-xs text-slate-400 mt-2">Ready to process requests for {activeTab.toLowerCase()}.</p>
+        {/* REPAIR MANIFEST MODAL */}
+        {activeRepair && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+              <h3 className="text-lg font-bold text-white">Role-Locked Repair Engine</h3>
+              <p className="text-xs text-slate-400">
+                The engine isolated unresolved garment roles and locked all valid components in place.
+              </p>
+              
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Repair Status:</span>
+                  <span className="text-amber-400 font-semibold">{activeRepair.status}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Unresolved Roles:</span>
+                  <span className="text-rose-400 font-semibold">
+                    {activeRepair.unresolved_roles.join(', ') || 'None'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Locked Valid Roles:</span>
+                  <span className="text-emerald-400 font-semibold">
+                    {activeRepair.locked_products.map(p => p.role).join(', ')}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setActiveRepair(null)}
+                  className="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-medium rounded-lg hover:bg-slate-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
+        {/* PREVIEW STUDIO MODAL */}
+        {activePreview && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 className="text-lg font-bold text-white">Reference Board Generated</h3>
+                <span className="text-xs font-mono bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">
+                  {activePreview.previewId}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-slate-400">ChatGPT Handoff Command</label>
+                <textarea
+                  readOnly
+                  rows={6}
+                  value={activePreview.chatgpt_prompt_command}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-300 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-between items-center pt-2">
+                <button
+                  onClick={() => navigator.clipboard.writeText(activePreview.chatgpt_prompt_command)}
+                  className="px-3 py-1.5 bg-slate-800 text-xs text-slate-200 font-medium rounded-lg hover:bg-slate-700"
+                >
+                  Copy Prompt Command
+                </button>
+                <button
+                  onClick={() => setActivePreview(null)}
+                  className="px-4 py-2 bg-blue-600 text-xs text-white font-medium rounded-lg hover:bg-blue-500"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB PLACEHOLDERS FOR OTHER MODULES */}
+        {activeTab !== 'Home' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center space-y-3">
+            <h3 className="text-xl font-bold text-white">{activeTab} Module</h3>
+            <p className="text-sm text-slate-400 max-w-md mx-auto">
+              Connected to active system state and ready to bind with database queries for {activeTab.toLowerCase()}.
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );
