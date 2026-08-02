@@ -5,7 +5,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// Increase API payload limit for Next.js
+// Increase Next.js API payload size limit to 10MB
 export const config = {
   api: {
     bodyParser: {
@@ -20,51 +20,45 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { imageBase64, modelName = 'model', angle = 'front' } = req.body;
+    const { imageBase64, modelName = 'default', angle = 'front' } = req.body;
 
     if (!imageBase64) {
-      return res.status(400).json({ error: 'No image data provided' });
+      return res.status(400).json({ error: 'Missing image data' });
     }
 
-    // Convert Base64 data to binary Buffer
+    // Convert Base64 string to Buffer
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Clean name: alphanumeric characters only
-    const cleanModel = String(modelName).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const cleanAngle = String(angle).toLowerCase().replace(/[^a-z0-9]/g, '');
-    
-    // Simple, flat filename without subfolders to ensure valid pathing
-    const fileName = `${cleanModel || 'model'}_${cleanAngle || 'front'}_${Date.now()}.jpg`;
+    // Clean name string for safe file naming
+    const safeModel = String(modelName).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') || 'model';
+    const safeAngle = String(angle).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') || 'front';
+    const fileName = `${safeModel}_${safeAngle}_${Date.now()}.jpg`;
 
-    // Target bucket (Ensure your bucket in Supabase dashboard is named "outfit-images")
-    const BUCKET_NAME = 'outfit-images';
-
+    // Upload directly to public bucket 'outfit-images'
     const { data, error } = await supabase.storage
-      .from(BUCKET_NAME)
+      .from('outfit-images')
       .upload(fileName, buffer, {
         contentType: 'image/jpeg',
         upsert: true,
       });
 
     if (error) {
-      console.error('Supabase Upload Error:', error);
       return res.status(500).json({ error: error.message });
     }
 
-    // Get public URL for the uploaded photo
+    // Get Public URL
     const { data: publicUrlData } = supabase.storage
-      .from(BUCKET_NAME)
+      .from('outfit-images')
       .getPublicUrl(fileName);
 
     return res.status(200).json({ 
       url: publicUrlData.publicUrl, 
-      angle: cleanAngle, 
-      modelName: cleanModel 
+      angle: safeAngle, 
+      modelName: safeModel 
     });
 
   } catch (err) {
-    console.error('API Error:', err);
-    return res.status(500).json({ error: err.message || 'Server error during upload' });
+    return res.status(500).json({ error: err.message || 'Internal Server Error' });
   }
 }
