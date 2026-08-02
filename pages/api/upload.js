@@ -5,7 +5,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// Increase Next.js API route payload size limit to 10MB
+// Increase API payload limit for Next.js
 export const config = {
   api: {
     bodyParser: {
@@ -20,34 +20,51 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { imageBase64, modelName = 'default', angle = 'front' } = req.body;
-    
-    // Clean base64 string and extract buffer
+    const { imageBase64, modelName = 'model', angle = 'front' } = req.body;
+
+    if (!imageBase64) {
+      return res.status(400).json({ error: 'No image data provided' });
+    }
+
+    // Convert Base64 data to binary Buffer
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Sanitize model name (remove special characters/spaces)
-    const safeModelName = modelName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') || 'model';
-    const safeAngle = angle.trim().toLowerCase();
+    // Clean name: alphanumeric characters only
+    const cleanModel = String(modelName).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanAngle = String(angle).toLowerCase().replace(/[^a-z0-9]/g, '');
     
-    // Create a flat filename that Supabase Storage accepts without folder path errors
-    const filePath = `${safeModelName}_${safeAngle}_${Date.now()}.jpg`;
+    // Simple, flat filename without subfolders to ensure valid pathing
+    const fileName = `${cleanModel || 'model'}_${cleanAngle || 'front'}_${Date.now()}.jpg`;
+
+    // Target bucket (Ensure your bucket in Supabase dashboard is named "outfit-images")
+    const BUCKET_NAME = 'outfit-images';
 
     const { data, error } = await supabase.storage
-      .from('outfit-images')
-      .upload(filePath, buffer, {
+      .from(BUCKET_NAME)
+      .upload(fileName, buffer, {
         contentType: 'image/jpeg',
         upsert: true,
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase Upload Error:', error);
+      return res.status(500).json({ error: error.message });
+    }
 
+    // Get public URL for the uploaded photo
     const { data: publicUrlData } = supabase.storage
-      .from('outfit-images')
-      .getPublicUrl(data.path);
+      .from(BUCKET_NAME)
+      .getPublicUrl(fileName);
 
-    return res.status(200).json({ url: publicUrlData.publicUrl, angle, modelName });
+    return res.status(200).json({ 
+      url: publicUrlData.publicUrl, 
+      angle: cleanAngle, 
+      modelName: cleanModel 
+    });
+
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('API Error:', err);
+    return res.status(500).json({ error: err.message || 'Server error during upload' });
   }
 }
